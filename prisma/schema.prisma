@@ -1,0 +1,363 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AppSettings {
+  id String @unique @db.VarChar(12)
+  appId BigInt @id @default(autoincrement()) @map("app_id")
+  name String
+  shortName String @default("") @map("short_name")
+  moto String @default("")
+  description String @db.Text @default("")
+  logoUrl String? @map("logo_url")
+  favicon String?
+  currency Currency @default(CDF)
+  language AppLanguage @default(FR)
+  status AppStatus @default(OPENED)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("store_settings")
+}
+
+enum AppLanguage {
+  EN
+  FR
+}
+
+enum AppStatus {
+  OPENED
+  MAINTENANCE
+  CLOSED
+}
+
+enum Currency {
+  USD
+  CDF
+}
+
+model User {
+  id String @unique @db.VarChar(12)
+  userId BigInt @id @default(autoincrement()) @map("user-id")
+  names String
+  phone String @unique
+  role Role
+  blacklist Boolean @default(false)
+  cartId BigInt? @unique @map("cart_id")
+  cart Cart? @relation(fields: [cartId],references: [cartId],onDelete: SetNull)
+  orders Order[]
+  productCategories ProductCategory[]
+  products Product[]
+  posts Post[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("users")
+}
+
+enum Role {
+  CLIENT
+  EDITOR
+  SHOP_MANAGER
+  ADMIN
+  OWNER
+}
+
+model Image {
+  id String @unique @db.VarChar(12)
+  imageId BigInt @id @default(autoincrement()) @map("image_id")
+  src String
+  alt String? @default("")
+  products ImagesOnProducts[]
+  productCategories ProductCategory[]
+  productsImage Product[]
+  posts Post[]
+  postCategories PostCategory[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("images")
+}
+
+model ImagesOnProducts {
+  productId BigInt @map("product_id")
+  product Product @relation(fields: [productId],references: [productId],onDelete: Cascade)
+  imageId BigInt @map("image_id")
+  image Image @relation(fields: [imageId],references: [imageId], onDelete: Cascade)
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  @@id([productId,imageId])
+  @@map("images_on_products")
+}
+
+
+model ProductCategory {
+    id String @unique @db.VarChar(12)
+    productCategoryId BigInt @id @default(autoincrement()) @map("product_category_id")
+    name String
+    slug String @unique
+    imageId BigInt? @map("image_id")
+    image Image? @relation(fields: [imageId], references: [imageId], onDelete: SetNull)
+    parentId BigInt? @map("parent_id")
+    parent ProductCategory? @relation("categories",fields: [parentId],references: [productCategoryId], onDelete: SetNull)
+    children ProductCategory[] @relation("categories")
+    description String @db.Text @default("")
+    public Boolean @default(true)
+    featured Boolean @default(false) //En vedette
+    products CategoriesOnProducts[]
+    createdById BigInt @map("created_by_id")
+    createdBy User @relation(fields: [createdById],references: [userId], onDelete: Cascade)
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("product_categories")
+}
+
+model CategoriesOnProducts {
+  productCategoryId BigInt @map("product_category_id")
+  productCategory ProductCategory @relation(fields: [productCategoryId],references: [productCategoryId], onDelete: Cascade)
+  productId BigInt @map("product_id")
+  product Product @relation(fields: [productId],references: [productId],onDelete: Cascade)
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  @@id([productCategoryId,productId])
+  @@map("categories_on_products")
+}
+
+model ProductTag {
+  id String @unique @db.VarChar(12)
+  productTagId BigInt @id @default(autoincrement()) @map("product_tag_id")
+  name String
+  description String? @db.Text @default("")
+  products TagsOnProducts[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("product_tags")
+}
+
+model TagsOnProducts {
+  productTagId BigInt @map("product_tag_id")
+  productTag ProductTag @relation(fields: [productTagId],references: [productTagId], onDelete: Cascade)
+  productId BigInt @map("product_id")
+  product Product @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+  @@id([productTagId, productId])
+  @@map("tags_on_products")
+}
+
+model Product {
+    id String @unique @db.VarChar(12)
+    productId BigInt @id @default(autoincrement()) @map("product_id")
+    name String
+    slug String @unique
+    shortDescription String @db.VarChar(255) @default("") @map("short_description")
+    description String @db.Text @default("")
+    imageId BigInt? @map("image_id") 
+    image Image? @relation(fields: [imageId],references: [imageId], onDelete: SetNull)
+    images ImagesOnProducts[]
+    price Float
+    regularPrice Float @map("regular_price")
+    status ProductStatus @default(DRAFT)
+    cartItems CartItem[]
+    stockQuantity Int @map("stock_quantity")
+    categories CategoriesOnProducts[]
+    tags TagsOnProducts[]
+    isVirtual Boolean @default(false)
+    downloadable Boolean @default(false)
+    featured Boolean @default(false) //En vedette
+    createdById BigInt @map("created_by_id")
+    createdBy User @relation(fields: [createdById],references: [userId], onDelete: Cascade)
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+    @@map("products")
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING
+  PRIVATE
+  PUBLISH
+}
+
+model CartItem {
+    id String @unique @db.VarChar(12)
+    cartItemId BigInt @id @default(autoincrement()) @map("cart_item_id")
+    productId BigInt @map("product_id")
+    product Product @relation(fields: [productId],references: [productId],onDelete: Cascade)
+    name String
+    quantity Int
+    price Float
+    image String? @default("")
+    cartId BigInt @map("cart_id")
+    cart Cart @relation(fields: [cartId],references: [cartId], onDelete: Cascade)
+    orderId BigInt?
+    order Order? @relation(fields: [orderId],references: [orderId],onDelete: Cascade)
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+    @@map("cart_items")
+}
+
+model Cart {
+  id String @unique @db.VarChar(12)
+  cartId BigInt @id @default(autoincrement()) @map("cart_id")
+  items CartItem[]
+  owner User?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("carts")
+}
+
+model Order {
+  id String @unique @db.VarChar(12)
+  orderId BigInt @id @default(autoincrement()) @map("order_id")
+  number String @unique
+  items CartItem[]
+  ownerId BigInt? @map("owner_id")
+  owner User? @relation(fields: [ownerId],references: [userId],onDelete: Cascade)
+  billing BillingInfo?
+  shipping ShippingInfo?
+  total_cart Float
+  shippingCost Float @map("shipping_cost")
+  total Float
+  status OrderStatus @default(PENDING)
+  isPaid Boolean
+  currency Currency
+  paymentMethodId BigInt @map("payment_method_id")
+  paymentMethod PaymentMehod @relation(fields: [paymentMethodId],references: [paymentMethodId])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("orders")
+}
+
+model BillingInfo {
+  id String @unique @db.VarChar(12)
+  billingInfoId BigInt @id @default(autoincrement()) @map("billing_info_id")
+  names String
+  phone String
+  email String? @default("")
+  address String? @default("")
+  orderId BigInt @unique  @map("order_id") 
+  order Order @relation(fields: [orderId],references: [orderId],onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("billing_info")
+}
+
+model ShippingInfo {
+  id String @unique @db.VarChar(12)
+  shippingInfoId BigInt @id @default(autoincrement()) @map("shipping_info_id")
+  orderId BigInt @unique @map("order_id")
+  order Order @relation(fields: [orderId],references: [orderId], onDelete: Cascade)
+  names String? @default("")
+  country String
+  city String
+  address String? @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("shipping_info")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  ON_HOLD
+  TRASH
+}
+
+model PaymentMehod {
+  id String @unique @db.VarChar(12)
+  paymentMethodId BigInt @id @default(autoincrement()) @map("payment_method_id")
+  name String
+  description String? @default("")
+  isDefault Boolean @default(false)
+  orders Order[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("payment_methods")
+}
+
+// =============== BLOG ===========
+
+model PostCategory {
+  id String @unique @db.VarChar(12)
+  postCategoryId BigInt @id @default(autoincrement()) @map("post_category_id")
+  name String
+  slug String @unique
+  imageId BigInt? @map("image_id")
+  image Image? @relation(fields: [imageId], references: [imageId], onDelete: SetNull)
+  parentId BigInt? @map("parent_id")
+  parent PostCategory? @relation("categories",fields: [parentId],references: [postCategoryId], onDelete: SetNull)
+  children PostCategory[] @relation("categories")
+  description String @db.Text @default("")
+  public Boolean @default(true)
+  featured Boolean @default(false) //En vedette
+  posts CategoriesOnPosts[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("post_categories")
+}
+
+model CategoriesOnPosts {
+  postCategoryId BigInt @map("post_category_id")
+  postCategory PostCategory @relation(fields: [postCategoryId], references: [postCategoryId], onDelete: Cascade)
+  postId BigInt @map("post_id")
+  post Post @relation(fields: [postId],references: [postId],onDelete:  Cascade)
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  @@id([postCategoryId,postId])
+}
+
+model Post {
+  id String @unique @db.VarChar(12)
+  postId BigInt @id @default(autoincrement()) @map("post_id")
+  slug String @unique
+  title String
+  content String @db.Text @default("")
+  imageId BigInt? @map("image_id")
+  image Image? @relation(fields: [imageId],references: [imageId],onDelete:SetNull)
+  categories CategoriesOnPosts[]
+  tags TagsOnPosts[]
+  authorId BigInt? @map("author_id")
+  author User? @relation(fields: [authorId],references: [userId], onDelete: SetNull )
+  featured Boolean @default(false) //En vedette
+  status PostStatus @default(DRAFT)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("posts")
+}
+
+model PostTag {
+  id String @unique @db.VarChar(12)
+  postTagId BigInt @id @default(autoincrement()) @map("post_tag_id")
+  name String
+  description String? @db.Text @default("")
+  posts TagsOnPosts[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("post_tags")
+}
+
+model TagsOnPosts {
+  postTagId BigInt @map("post_tag_id")
+  postTag PostTag @relation(fields: [postTagId],references: [postTagId], onDelete: Cascade)
+  postId BigInt @map("post_id")
+  post Post @relation(fields: [postId], references: [postId], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+  @@id([postTagId, postId])
+  @@map("tags_on_posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING
+  PRIVATE
+  PUBLISH
+}
+
